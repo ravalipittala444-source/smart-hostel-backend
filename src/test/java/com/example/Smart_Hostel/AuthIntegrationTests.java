@@ -19,7 +19,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -245,5 +247,42 @@ public class AuthIntegrationTests {
                 .content(newUserJson))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void test9_corsPreflight_allowsDeployedVercelOrigin() throws Exception {
+        mockMvc.perform(options("/api/auth/login")
+                .header("Origin", "https://smart-hostel-frontend-beige.vercel.app")
+                .header("Access-Control-Request-Method", "POST")
+                .header("Access-Control-Request-Headers", "authorization,content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://smart-hostel-frontend-beige.vercel.app"))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"))
+                .andExpect(header().exists("Access-Control-Allow-Methods"));
+    }
+
+    @Test
+    void test10_corsPreflight_rejectsUnallowedOrigin() throws Exception {
+        mockMvc.perform(options("/api/auth/login")
+                .header("Origin", "https://unauthorized-malicious-site.com")
+                .header("Access-Control-Request-Method", "POST")
+                .header("Access-Control-Request-Headers", "authorization,content-type"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void test11_rootAndHealthEndpoints_returnSuccess() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+
+        mockMvc.perform(get("/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+
+        mockMvc.perform(get("/api/auth/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
 }
+
 
